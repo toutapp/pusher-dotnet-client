@@ -98,83 +98,94 @@ namespace PusherClient
 
             Debug.WriteLine(e.Message);
 
-
             var template = new { @event = String.Empty, data = String.Empty, channel = String.Empty };
-            var message = JsonConvert.DeserializeAnonymousType(e.Message, template);
 
-            _pusher.EmitEvent(message.@event, message.data);
-
-            if (message.@event.StartsWith("pusher"))
+            try
             {
-                // Assume Pusher event
-                switch (message.@event)
+                var message = JsonConvert.DeserializeAnonymousType(e.Message, template);
+                _pusher.EmitEvent(message.@event, message.data);
+
+                if (message.@event.StartsWith("pusher"))
                 {
-                    case Constants.ERROR:
-                        ParseError(message.data);
-                        break;
+                    // Assume Pusher event
+                    switch (message.@event)
+                    {
+                        case Constants.ERROR:
+                            ParseError(message.data);
+                            break;
 
-                    case Constants.CONNECTION_ESTABLISHED:
-                        ParseConnectionEstablished(message.data);
-                        break;
+                        case Constants.CONNECTION_ESTABLISHED:
+                            ParseConnectionEstablished(message.data);
+                            break;
 
-                    case Constants.CHANNEL_SUBSCRIPTION_SUCCEEDED:
+                        case Constants.CHANNEL_SUBSCRIPTION_SUCCEEDED:
 
-                        if (_pusher.Channels.ContainsKey(message.channel))
-                        {
-                            var channel = _pusher.Channels[message.channel];
-                            channel.SubscriptionSucceeded(message.data);
-                        }
-
-                        break;
-
-                    case Constants.CHANNEL_SUBSCRIPTION_ERROR:
-
-                        throw new PusherException("Error received on channel subscriptions: " + e.Message, ErrorCodes.SubscriptionError);
-
-                    case Constants.CHANNEL_MEMBER_ADDED:
-
-                        // Assume channel event
-                        if (_pusher.Channels.ContainsKey(message.channel))
-                        {
-                            var channel = _pusher.Channels[message.channel];
-
-                            if (channel is PresenceChannel)
+                            if (_pusher.Channels.ContainsKey(message.channel))
                             {
-                                ((PresenceChannel)channel).AddMember(message.data);
-                                break;
+                                var channel = _pusher.Channels[message.channel];
+                                channel.SubscriptionSucceeded(message.data);
                             }
-                        }
 
-                        Pusher.Trace.TraceEvent(TraceEventType.Warning, 0, "Received a presence event on channel '" + message.channel + "', however there is no presence channel which matches.");
-                        break;
+                            break;
 
-                    case Constants.CHANNEL_MEMBER_REMOVED:
+                        case Constants.CHANNEL_SUBSCRIPTION_ERROR:
 
-                        // Assume channel event
-                        if (_pusher.Channels.ContainsKey(message.channel))
-                        {
-                            var channel = _pusher.Channels[message.channel];
+                            throw new PusherException("Error received on channel subscriptions: " + e.Message,
+                                ErrorCodes.SubscriptionError);
 
-                            if (channel is PresenceChannel)
+                        case Constants.CHANNEL_MEMBER_ADDED:
+
+                            // Assume channel event
+                            if (_pusher.Channels.ContainsKey(message.channel))
                             {
-                                ((PresenceChannel)channel).RemoveMember(message.data);
-                                break;
+                                var channel = _pusher.Channels[message.channel];
+
+                                if (channel is PresenceChannel)
+                                {
+                                    ((PresenceChannel) channel).AddMember(message.data);
+                                    break;
+                                }
                             }
-                        }
 
-                        Pusher.Trace.TraceEvent(TraceEventType.Warning, 0, "Received a presence event on channel '" + message.channel + "', however there is no presence channel which matches.");
-                        break;
+                            Pusher.Trace.TraceEvent(TraceEventType.Warning, 0,
+                                "Received a presence event on channel '" + message.channel +
+                                "', however there is no presence channel which matches.");
+                            break;
 
+                        case Constants.CHANNEL_MEMBER_REMOVED:
+
+                            // Assume channel event
+                            if (_pusher.Channels.ContainsKey(message.channel))
+                            {
+                                var channel = _pusher.Channels[message.channel];
+
+                                if (channel is PresenceChannel)
+                                {
+                                    ((PresenceChannel) channel).RemoveMember(message.data);
+                                    break;
+                                }
+                            }
+
+                            Pusher.Trace.TraceEvent(TraceEventType.Warning, 0,
+                                "Received a presence event on channel '" + message.channel +
+                                "', however there is no presence channel which matches.");
+                            break;
+
+                    }
+                }
+                else
+                {
+                    // Assume channel event
+                    if (_pusher.Channels.ContainsKey(message.channel))
+                        _pusher.Channels[message.channel].EmitEvent(message.@event, message.data);
                 }
             }
-            else
+            catch (Exception ex)
             {
-                // Assume channel event
-                if (_pusher.Channels.ContainsKey(message.channel))
-                    _pusher.Channels[message.channel].EmitEvent(message.@event, message.data);
+                throw new ApplicationException(
+                    "An error occurred while parsing the pusher response: " + e.Message, ex);
             }
 
-            
         }
 
         private void websocket_Opened(object sender, EventArgs e)
