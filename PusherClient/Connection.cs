@@ -103,8 +103,8 @@ namespace PusherClient
             // It stems from the fact that the data object is a string normally except when an error is sent back
             // then it's an object.
 
-            // bad: "{\"event\":\"pusher:error\",\"data\":{\"code\":4201,\"message\":\"Pong reply not received\"}}"
-            // good:  "{\"event\":\"pusher:error\",\"data\":\"{\\\"code\\\":4201,\\\"message\\\":\\\"Pong reply not received\\\"}\"}";
+            // bad:  "{\"event\":\"pusher:error\",\"data\":{\"code\":4201,\"message\":\"Pong reply not received\"}}"
+            // good: "{\"event\":\"pusher:error\",\"data\":\"{\\\"code\\\":4201,\\\"message\\\":\\\"Pong reply not received\\\"}\"}";
 
             var jObject = JObject.Parse(e.Message);
 
