@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using WebSocket4Net;
 
 namespace PusherClient
@@ -98,11 +99,25 @@ namespace PusherClient
 
             Debug.WriteLine(e.Message);
 
+            // DeserializeAnonymousType will throw and error when an error comes back from pusher
+            // It stems from the fact that the data object is a string normally except when an error is sent back
+            // then it's an object.
+
+            // bad: "{\"event\":\"pusher:error\",\"data\":{\"code\":4201,\"message\":\"Pong reply not received\"}}"
+            // good:  "{\"event\":\"pusher:error\",\"data\":\"{\\\"code\\\":4201,\\\"message\\\":\\\"Pong reply not received\\\"}\"}";
+
+            var jObject = JObject.Parse(e.Message);
+
+            if (jObject ["data"] != null && jObject ["data"].Type != JTokenType.String)
+                jObject ["data"] = jObject ["data"].ToString(Formatting.None);
+
+            string jsonMessage = jObject.ToString(Formatting.None);
             var template = new { @event = String.Empty, data = String.Empty, channel = String.Empty };
 
             try
             {
-                var message = JsonConvert.DeserializeAnonymousType(e.Message, template);
+                //var message = JsonConvert.DeserializeAnonymousType(e.Message, template);
+                var message = JsonConvert.DeserializeAnonymousType(jsonMessage, template);
                 _pusher.EmitEvent(message.@event, message.data);
 
                 if (message.@event.StartsWith("pusher"))
@@ -122,7 +137,7 @@ namespace PusherClient
 
                             if (_pusher.Channels.ContainsKey(message.channel))
                             {
-                                var channel = _pusher.Channels[message.channel];
+                                var channel = _pusher.Channels [message.channel];
                                 channel.SubscriptionSucceeded(message.data);
                             }
 
@@ -138,7 +153,7 @@ namespace PusherClient
                             // Assume channel event
                             if (_pusher.Channels.ContainsKey(message.channel))
                             {
-                                var channel = _pusher.Channels[message.channel];
+                                var channel = _pusher.Channels [message.channel];
 
                                 if (channel is PresenceChannel)
                                 {
@@ -157,7 +172,7 @@ namespace PusherClient
                             // Assume channel event
                             if (_pusher.Channels.ContainsKey(message.channel))
                             {
-                                var channel = _pusher.Channels[message.channel];
+                                var channel = _pusher.Channels [message.channel];
 
                                 if (channel is PresenceChannel)
                                 {
@@ -177,7 +192,7 @@ namespace PusherClient
                 {
                     // Assume channel event
                     if (_pusher.Channels.ContainsKey(message.channel))
-                        _pusher.Channels[message.channel].EmitEvent(message.@event, message.data);
+                        _pusher.Channels [message.channel].EmitEvent(message.@event, message.data);
                 }
             }
             catch (Exception ex)
@@ -199,7 +214,7 @@ namespace PusherClient
 
             ChangeState(ConnectionState.Disconnected);
 
-            if(_allowReconnect)
+            if (_allowReconnect)
                 Connect();
         }
 
@@ -230,7 +245,7 @@ namespace PusherClient
             ErrorCodes error = ErrorCodes.Unkown;
 
             if (Enum.IsDefined(typeof(ErrorCodes), parsed.code))
-                error = (ErrorCodes)parsed.code;
+                error = (ErrorCodes) parsed.code;
 
             throw new PusherException(parsed.message, error);
         }
