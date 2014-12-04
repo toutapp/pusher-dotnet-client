@@ -185,7 +185,6 @@ namespace PusherClient
                                 "Received a presence event on channel '" + message.channel +
                                 "', however there is no presence channel which matches.");
                             break;
-
                     }
                 }
                 else
@@ -194,6 +193,12 @@ namespace PusherClient
                     if (_pusher.Channels.ContainsKey(message.channel))
                         _pusher.Channels [message.channel].EmitEvent(message.@event, message.data);
                 }
+            }
+            catch (PusherException ex)
+            {
+                // Disconnect on pusher:error events
+                Pusher.Trace.TraceEvent(TraceEventType.Warning, 0, "Websocket connection has been closed");
+                Disconnect();
             }
             catch (Exception ex)
             {
@@ -251,6 +256,5 @@ namespace PusherClient
         }
 
         #endregion
-
     }
 }
